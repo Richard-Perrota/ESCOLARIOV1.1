@@ -1,11 +1,14 @@
 package com.example.escolario.activities.user;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import com.example.escolario.activities.auth.LoginActivity;
 import com.example.escolario.data.AppDatabase;
 import com.example.escolario.databinding.ActivityNoteBinding;
 import com.example.escolario.model.Note;
+import com.example.escolario.utils.SessionManager;
 import com.example.escolario.utils.Validator;
 
 /**
@@ -30,21 +33,33 @@ public class NoteActivity extends AppCompatActivity {
         binding = ActivityNoteBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Recupera os dados do usuário da Intent
-        userId = getIntent().getIntExtra("USER_ID", -1);
-        String userName = getIntent().getStringExtra("USER_NAME");
+        // Verifica sessão
+        SessionManager session = new SessionManager(this);
+        if (!session.isLoggedIn()) {
+            startActivity(new Intent(this, LoginActivity.class));
+            finish();
+            return;
+        }
 
-        // Configura a interface
-        setupUI(userName);
+        setupUI(); // ← Chamada sem argumentos
     }
 
     /**
      * Configura os elementos da interface do usuário.
      * param userName Nome do usuário para exibição personalizada
      */
-    private void setupUI(String userName) {
-        binding.tvWelcome.setText(String.format("Olá, %s! O que vamos registrar hoje?", userName));
+    // 1. Deixe o método sem parâmetros
+    private void setupUI() {
+        SessionManager session = new SessionManager(this);
+        String userName = session.getUserName();
+
+        binding.tvWelcome.setText(String.format("Olá, %s!", userName));
         binding.btnSave.setOnClickListener(v -> saveNote());
+        binding.btnLogout.setOnClickListener(v -> {
+            new SessionManager(this).logout();
+            startActivity(new Intent(this, LoginActivity.class));
+            finish();
+        });
     }
 
     /**
@@ -65,7 +80,7 @@ public class NoteActivity extends AppCompatActivity {
         String content = binding.etContent.getText().toString().trim();
 
         // Validações
-        if (!validateInputs(subject, date, content)) {
+        if (!validateInputs(subject, date, type, content)) {
             return;
         }
 
@@ -76,7 +91,7 @@ public class NoteActivity extends AppCompatActivity {
      * Valida os campos de entrada.
      * return true se todos os campos são válidos, false caso contrário
      */
-    private boolean validateInputs(String subject, String date, String content) {
+    private boolean validateInputs(String subject, String date, String content, String s) {
         if (subject.isEmpty()) {
             showToast("Informe a matéria");
             return false;

@@ -3,6 +3,7 @@ package com.example.escolario.data;
 import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
+
 import android.content.Context;
 
 import com.example.escolario.model.Note;
@@ -10,7 +11,7 @@ import com.example.escolario.model.User;
 
 /**
  * Classe principal do banco de dados Room para a aplicação Escolario.
- *
+ * <p>
  * Define a configuração do banco de dados e fornece acesso aos DAOs.
  * Implementa o padrão Singleton para garantir uma única instância do banco de dados.
  */
@@ -19,6 +20,7 @@ public abstract class AppDatabase extends RoomDatabase {
 
     // DAOs disponíveis
     public abstract UserDao userDao();
+
     public abstract NoteDao noteDao();
 
     // Instância Singleton
@@ -26,7 +28,7 @@ public abstract class AppDatabase extends RoomDatabase {
 
     /**
      * Obtém a instância única do banco de dados.
-     *
+     * <p>
      * param context Contexto da aplicação
      * return Instância do AppDatabase
      */

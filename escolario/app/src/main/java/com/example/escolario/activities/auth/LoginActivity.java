@@ -10,54 +10,69 @@ import com.example.escolario.activities.user.NoteActivity;
 import com.example.escolario.databinding.ActivityLoginBinding;
 import com.example.escolario.model.User;
 import com.example.escolario.utils.PasswordUtils;
+import com.example.escolario.utils.SessionManager;
 
 /**
- * Activity responsável pela autenticação de usuários no sistema.
- * Gerencia o processo de login, redirecionando para as telas apropriadas
- * conforme o tipo de usuário (admin ou comum).
+ * Tela de login do aplicativo Escolario.
+ * Responsável por:
+ * - Autenticar usuários com credenciais válidas
+ * - Redirecionar para telas específicas (admin/aluno)
+ * - Gerenciar erros de autenticação
+ *
+ * Fluxo principal:
+ * 1. Valida campos de entrada
+ * 2. Consulta banco de dados em background
+ * 3. Verifica credenciais com BCrypt
+ * 4. Inicia sessão e redireciona
  */
 public class LoginActivity extends AppCompatActivity {
-    private ActivityLoginBinding binding;
+    private ActivityLoginBinding binding; // ViewBinding para acesso seguro às views
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Configuração inicial da view usando ViewBinding
         binding = ActivityLoginBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Configura os listeners dos botões
+        // Configuração dos listeners
+        setupButtonListeners();
+    }
+
+    /**
+     * Configura os listeners para os botões da interface.
+     * Padrão: lambda expressions para código conciso.
+     */
+    private void setupButtonListeners() {
         binding.btnLogin.setOnClickListener(v -> attemptLogin());
         binding.btnRegister.setOnClickListener(v -> openRegisterScreen());
     }
 
     /**
-     * Realiza a tentativa de login com as credenciais fornecidas.
-     * Valida os campos e verifica no banco de dados em uma thread separada.
+     * Processa a tentativa de login com validações.
+     * Fluxo:
+     * 1. Obtém valores dos campos
+     * 2. Validações básicas
+     * 3. Consulta assíncrona ao banco
+     * 4. Verificação de senha com BCrypt
      */
     private void attemptLogin() {
+        // Normaliza email (remove espaços e converte para minúsculas)
         String email = binding.etEmail.getText().toString().trim().toLowerCase();
         String password = binding.etPassword.getText().toString();
 
-        // Validação básica dos campos
-        if (email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show();
+        if (!validateInputs(email, password)) {
             return;
         }
 
+        // Thread secundária para operações de I/O
         new Thread(() -> {
             try {
                 AppDatabase db = AppDatabase.getDatabase(this);
-                // Busca usuário por email (sem aplicar hash na busca)
                 User user = db.userDao().findByEmail(email);
 
-                runOnUiThread(() -> {
-                    // Verifica se o usuário existe e se a senha corresponde
-                    if (user != null && PasswordUtils.verify(password, user.password)) {
-                        redirectUser(user);
-                    } else {
-                        Toast.makeText(this, "Credenciais inválidas", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                runOnUiThread(() -> handleLoginResult(user, password));
             } catch (Exception e) {
                 runOnUiThread(() ->
                         Toast.makeText(this, "Erro: " + e.getMessage(), Toast.LENGTH_SHORT).show()
@@ -67,25 +82,49 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     /**
-     * Redireciona o usuário para a tela apropriada conforme seu tipo (admin ou comum).
-     * @param user Objeto User contendo os dados do usuário autenticado
+     * Valida os campos de entrada antes da consulta ao banco.
+     * @return true se os campos são válidos
      */
-    private void redirectUser(User user) {
-        Intent intent;
-        if (user.isAdmin) {
-            intent = new Intent(this, UserListActivity.class);  // Tela de administração
-        } else {
-            intent = new Intent(this, NoteActivity.class);      // Tela de usuário comum
+    private boolean validateInputs(String email, String password) {
+        if (email.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show();
+            return false;
         }
-        // Passa dados do usuário para a próxima activity
-        intent.putExtra("USER_ID", user.id);
-        intent.putExtra("USER_NAME", user.name);
-        startActivity(intent);
-        finish();  // Finaliza a activity atual para evitar retorno não desejado
+        return true;
     }
 
     /**
-     * Abre a tela de cadastro de novos usuários.
+     * Processa o resultado da consulta ao banco de dados.
+     * @param user Usuário encontrado (ou null)
+     * @param password Senha em texto puro para verificação
+     */
+    private void handleLoginResult(User user, String password) {
+        if (user != null && PasswordUtils.verify(password, user.password)) {
+            redirectUser(user);
+        } else {
+            // Mensagem genérica por segurança (não revela se email existe)
+            Toast.makeText(this, "Credenciais inválidas", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Redireciona o usuário para a tela apropriada e inicia sessão.
+     * @param user Usuário autenticado
+     */
+    private void redirectUser(User user) {
+        // Cria/atualiza a sessão
+        new SessionManager(this).createSession(user.id, user.isAdmin, user.name);
+
+        Intent intent = user.isAdmin
+                ? new Intent(this, UserListActivity.class)
+                : new Intent(this, NoteActivity.class);
+
+        startActivity(intent);
+        finish(); // Impede retorno à tela de login com back button
+    }
+
+    /**
+     * Navega para a tela de cadastro.
      */
     private void openRegisterScreen() {
         startActivity(new Intent(this, RegisterActivity.class));

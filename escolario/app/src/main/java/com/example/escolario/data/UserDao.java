@@ -71,6 +71,9 @@ public interface UserDao {
      *
      * param user Objeto User a ser removido
      */
+
+    @Query("SELECT * FROM users WHERE isAdmin = 0 AND name LIKE :searchQuery")
+    LiveData<List<User>> searchUsers(String searchQuery);
     @Delete
     void delete(User user);
 }
